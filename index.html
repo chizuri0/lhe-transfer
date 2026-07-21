@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1015">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LHe Transfer">
+</head>
+<body>
+<title>LHe Transfer Helper</title>
+<style>
+  :root{
+    --bg:#eef2f6; --surface:#ffffff; --surface-2:#f4f7fa; --border:#d3dde4;
+    --text:#0f1a20; --text-dim:#5a6a74; --accent:#118198; --accent-strong:#0c6577;
+    --accent-weak:#e0f2f5; --good:#1f9d57; --warn:#b5760f; --bad:#c23b3b;
+    --shadow:0 1px 2px rgba(15,26,32,.06),0 6px 20px rgba(15,26,32,.05);
+    --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0b1015; --surface:#131c23; --surface-2:#0f171d; --border:#26333d;
+      --text:#e7eef2; --text-dim:#8ea0ab; --accent:#4fd6e8; --accent-strong:#7ee3f0;
+      --accent-weak:#0f333b; --good:#35c47c; --warn:#e0a23c; --bad:#e8666a;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#eef2f6; --surface:#ffffff; --surface-2:#f4f7fa; --border:#d3dde4;
+    --text:#0f1a20; --text-dim:#5a6a74; --accent:#118198; --accent-strong:#0c6577;
+    --accent-weak:#e0f2f5; --good:#1f9d57; --warn:#b5760f; --bad:#c23b3b;
+    --shadow:0 1px 2px rgba(15,26,32,.06),0 6px 20px rgba(15,26,32,.05);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1015; --surface:#131c23; --surface-2:#0f171d; --border:#26333d;
+    --text:#e7eef2; --text-dim:#8ea0ab; --accent:#4fd6e8; --accent-strong:#7ee3f0;
+    --accent-weak:#0f333b; --good:#35c47c; --warn:#e0a23c; --bad:#e8666a;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  }
+  *{box-sizing:border-box}
+  .wrap{
+    font-family:var(--font-sans); color:var(--text); background:var(--bg);
+    max-width:760px; margin:0 auto; padding:18px 16px 60px; line-height:1.45;
+    -webkit-text-size-adjust:100%;
+  }
+  .head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:4px}
+  h1{font-size:1.5rem; font-weight:700; letter-spacing:-.01em; margin:0}
+  .sub{color:var(--text-dim); font-size:.9rem; margin:2px 0 18px}
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:16px; margin-bottom:14px; box-shadow:var(--shadow);
+  }
+  .card > .ct{
+    font-size:.72rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--accent-strong); margin:0 0 12px;
+  }
+  .cols{display:grid; grid-template-columns:1fr; gap:14px}
+  @media (min-width:620px){ .cols{grid-template-columns:1fr 1fr} }
+  .phase{border:1px solid var(--border); border-radius:12px; padding:14px; background:var(--surface-2)}
+  .phase-t{display:flex; align-items:center; gap:8px; margin:0 0 12px}
+  .phase-t b{font-size:1rem}
+  .dot{width:9px; height:9px; border-radius:50%; background:var(--accent)}
+  .phase.after .dot{background:var(--warn)}
+  .field{margin-bottom:12px}
+  .field:last-child{margin-bottom:0}
+  label.lab{display:block; font-size:.82rem; color:var(--text-dim); margin-bottom:5px; font-weight:600}
+  input[type=number], input[type=time]{
+    width:100%; font-family:var(--font-sans); font-size:1.2rem; font-weight:600;
+    color:var(--text); background:var(--surface); border:1.5px solid var(--border);
+    border-radius:10px; padding:13px 14px; min-height:52px;
+    font-variant-numeric:tabular-nums; -moz-appearance:textfield;
+  }
+  input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input:focus-visible{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-weak)}
+  .withunit{position:relative}
+  .withunit .u{position:absolute; right:14px; top:50%; transform:translateY(-50%); color:var(--text-dim); font-size:.9rem; font-weight:600; pointer-events:none}
+  .withunit input{padding-right:44px}
+  .derived{
+    display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+    margin-top:6px; padding:4px 2px 0; font-size:.86rem; color:var(--text-dim);
+  }
+  .derived b{font-size:1.05rem; color:var(--accent-strong); font-variant-numeric:tabular-nums; font-weight:700}
+  .seg{display:flex; gap:0; border:1.5px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:8px}
+  .seg button{
+    flex:1; font-family:var(--font-sans); font-size:.82rem; font-weight:600; line-height:1.2;
+    padding:9px 6px; background:var(--surface); color:var(--text-dim); border:none; cursor:pointer;
+  }
+  .seg button + button{border-left:1.5px solid var(--border)}
+  .seg button[aria-pressed=true]{background:var(--accent-weak); color:var(--accent-strong)}
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .rowbtn{display:flex; gap:8px; align-items:flex-end}
+  .rowbtn .field{flex:1; margin:0}
+  .nowbtn{
+    flex:0 0 auto; font-family:var(--font-sans); font-size:.95rem; font-weight:700;
+    padding:0 16px; min-height:52px; border-radius:10px; cursor:pointer;
+    background:var(--accent-weak); color:var(--accent-strong); border:1.5px solid var(--border);
+  }
+  .phase-sub{margin-top:12px; padding-top:11px; border-top:1px dashed var(--border);
+    display:flex; justify-content:space-between; align-items:baseline}
+  .phase-sub span{font-size:.82rem; color:var(--text-dim); font-weight:600}
+  .phase-sub b{font-size:1.15rem; font-variant-numeric:tabular-nums}
+  /* results */
+  .res-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .eff-card{grid-column:1 / -1; background:var(--accent-weak); border:1px solid var(--border);
+    border-radius:12px; padding:16px; text-align:center}
+  .eff-card .k{font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:var(--accent-strong); font-weight:700}
+  .eff-card .v{font-size:2.6rem; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.1; margin-top:2px}
+  .eff-card .v small{font-size:1.2rem; font-weight:700; margin-left:2px}
+  .stat{background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:12px}
+  .stat .k{font-size:.76rem; color:var(--text-dim); font-weight:600}
+  .stat .v{font-size:1.35rem; font-weight:700; font-variant-numeric:tabular-nums; margin-top:3px}
+  .actions{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px}
+  .btn{
+    font-family:var(--font-sans); font-size:1rem; font-weight:700; padding:14px; min-height:52px;
+    border-radius:11px; cursor:pointer; border:1.5px solid var(--border); background:var(--surface); color:var(--text);
+  }
+  .btn.primary{grid-column:1 / -1; background:var(--accent); color:#04222a; border-color:transparent}
+  :root[data-theme="dark"] .btn.primary{color:#04222a}
+  .btn.primary:active{transform:translateY(1px)}
+  .btn:focus-visible{outline:none; box-shadow:0 0 0 3px var(--accent-weak)}
+  .muted{color:var(--text-dim)}
+  /* record cards */
+  .rec{border:1px solid var(--border); border-radius:12px; margin-bottom:10px; background:var(--surface-2); overflow:hidden}
+  .rec-head{width:100%; display:flex; align-items:center; gap:10px; padding:13px 14px; background:none; border:none; cursor:pointer; font-family:var(--font-sans); color:var(--text); text-align:left}
+  .rec-head .chev{color:var(--text-dim); font-size:.8rem; transition:transform .18s; display:inline-block}
+  .rec.open .rec-head .chev{transform:rotate(90deg)}
+  .rec-time{font-weight:700; font-size:1rem; font-variant-numeric:tabular-nums}
+  .rec-eff{margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; padding:3px 11px; border-radius:999px; font-size:.9rem; color:#fff}
+  .rec-body{padding:2px 14px 14px}
+  .nb{display:grid; grid-template-columns:1fr 1fr; gap:8px 14px;
+    padding:12px 0 4px; font-variant-numeric:tabular-nums; align-items:baseline}
+  .nbc{display:flex; flex-direction:column; gap:1px}
+  .nbc .lbl{color:var(--text-dim); font-weight:600; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em}
+  .nbc b{font-weight:700; font-size:.98rem; white-space:nowrap}
+  .nbc.head b{color:var(--accent-strong)}
+  .nb-delta{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+  .nb-delta div{flex:1 1 auto; min-width:96px; background:var(--surface); border:1px solid var(--border);
+    border-radius:9px; padding:9px 11px; font-size:.82rem; color:var(--text-dim); font-weight:600;
+    font-variant-numeric:tabular-nums; text-align:center}
+  .nb-delta div b{display:block; font-size:1.15rem; color:var(--accent-strong); margin-top:2px}
+  .nb-delta div.eff{background:var(--accent-weak)}
+  .del{color:var(--bad); cursor:pointer; font-weight:700; background:none; border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:.85rem; font-family:var(--font-sans); margin-top:6px}
+  .empty{color:var(--text-dim); font-size:.9rem; text-align:center; padding:14px 0}
+  .theme{background:none; border:1px solid var(--border); color:var(--text-dim); border-radius:8px; padding:5px 10px; font-size:.8rem; cursor:pointer; font-family:var(--font-sans)}
+  .note{font-size:.78rem; color:var(--text-dim); margin-top:10px}
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <h1>LHe Transfer Helper</h1>
+    <button class="theme" id="themeBtn" type="button">◐ theme</button>
+  </div>
+  <p class="sub">Dewar は cm を入れると表から L を自動換算・Plant は L/cm 切替・気体は psi→L。効率と合計 He を自動計算。</p>
+
+  <div class="card">
+    <p class="ct">Time</p>
+    <div class="two">
+      <div class="rowbtn">
+        <div class="field"><label class="lab" for="startTime">Start</label>
+          <input type="time" id="startTime"></div>
+        <button class="nowbtn" type="button" data-now="startTime">今</button>
+      </div>
+      <div class="rowbtn">
+        <div class="field"><label class="lab" for="endTime">End</label>
+          <input type="time" id="endTime"></div>
+        <button class="nowbtn" type="button" data-now="endTime">今</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cols" id="phases"></div>
+  </div>
+
+  <div class="card">
+    <p class="ct">Results</p>
+    <div class="res-grid">
+      <div class="eff-card">
+        <div class="k">Efficiency</div>
+        <div class="v" id="r_eff">—</div>
+        <div class="muted" id="r_eff_note" style="font-size:.8rem;margin-top:2px"></div>
+      </div>
+      <div class="stat"><div class="k">Dewar 増分</div><div class="v" id="r_dinc">—</div></div>
+      <div class="stat"><div class="k">Plant 減分</div><div class="v" id="r_pdec">—</div></div>
+      <div class="stat"><div class="k">合計 He (before)</div><div class="v" id="r_tb">—</div></div>
+      <div class="stat"><div class="k">合計 He (after)</div><div class="v" id="r_ta">—</div></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="saveBtn" type="button">この記録を保存</button>
+    <button class="btn" id="clearBtn" type="button">入力をクリア</button>
+    <button class="btn" id="csvBtn" type="button">CSV書き出し</button>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <p class="ct">保存した記録 <span class="muted" id="recCount"></span></p>
+    <div id="recList"></div>
+    <div class="empty" id="recEmpty">まだ記録はないよ。上で入力して「保存」してね。</div>
+    <p class="note">1件をタップすると、ノートと同じ並びで開くよ。記録はこの端末のブラウザ内（localStorage）だけに保存。CSVで書き出せば表計算にも渡せる。</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // Dewar cm -> L table (index = cm). 0 anchored at 0.
+  var DEWAR=[0,0.2,0.6,1.3,2.3,3.4,4.8,6.3,8.0,9.8,11.7,13.6,15.6,17.6,19.6,21.6,
+    23.6,25.6,27.6,29.5,31.5,33.5,35.5,37.5,39.5,41.5,43.5,45.5,47.5,49.5,51.5,
+    53.5,55.5,57.5,59.5,61.5,63.5,65.5,67.5,69.5,71.5,73.5,75.5,77.5,79.5,81.5,
+    83.5,85.5,87.4,89.4,91.4,93.4,95.4,97.4,99.3,101.1,102.9,104.5,105.9,107.2,
+    108.2,109.1,109.7,110.0];
+  var GAS_PSI_PER_L=6.75;         // 1 L = 6.75 psi
+  var PLANT_M=2.9, PLANT_B=-11.55; // L = cm*2.9 - 11.55  (valid > 90 L)
+
+  function dewarCmToL(cm){
+    if(cm==null||isNaN(cm)) return null;
+    if(cm<=0) return 0;
+    if(cm>=63) return DEWAR[63];
+    var lo=Math.floor(cm), hi=lo+1, f=cm-lo;
+    return DEWAR[lo]+(DEWAR[hi]-DEWAR[lo])*f;
+  }
+  function num(v){ if(v==null) return null; v=(""+v).trim(); if(v==="") return null; var n=parseFloat(v); return isNaN(n)?null:n; }
+  function fmt(v,d){ if(v==null||isNaN(v)) return "—"; return v.toFixed(d==null?1:d); }
+  function pad(n){ return (n<10?"0":"")+n; }
+
+  var state={}; // holds live values keyed by input id
+
+  // Build the two phase panels
+  var phasesEl=document.getElementById("phases");
+  ["before","after"].forEach(function(ph){
+    var isB=ph==="before";
+    var wrap=document.createElement("div");
+    wrap.className="phase "+(isB?"before":"after");
+    wrap.innerHTML=
+      '<p class="phase-t"><span class="dot"></span><b>'+(isB?"Before":"After")+'</b></p>'
+      + field(ph,"dewar_cm","Dewar","cm")
+      + '<div class="derived"><span>Dewar (表→L)</span><b id="'+ph+'_dewarL">—</b></div>'
+      + '<div class="field"><label class="lab">Plant</label>'
+      +   '<div class="seg" data-seg="'+ph+'">'
+      +     '<button type="button" data-mode="manual" aria-pressed="true">≤90L · L手入力</button>'
+      +     '<button type="button" data-mode="auto" aria-pressed="false">&gt;90L · cmで計算</button>'
+      +   '</div>'
+      +   '<div class="two">'
+      +     unit(ph+'_plant_cm','cm')
+      +     unit(ph+'_plant_L','L')
+      +   '</div>'
+      + '</div>'
+      + field(ph,"gas_psi","気体","psi")
+      + '<div class="derived"><span>気体 (psi→L)</span><b id="'+ph+'_gasL">—</b></div>'
+      + '<div class="phase-sub"><span>合計 '+(isB?"before":"after")+'</span><b id="'+ph+'_total">—</b></div>';
+    phasesEl.appendChild(wrap);
+  });
+
+  function field(ph,key,label,unitTxt){
+    var id=ph+"_"+key;
+    return '<div class="field"><label class="lab" for="'+id+'">'+label+'</label>'
+      + '<div class="withunit"><input type="number" inputmode="decimal" step="any" id="'+id+'">'
+      + '<span class="u">'+unitTxt+'</span></div></div>';
+  }
+  function unit(id,unitTxt){
+    return '<div class="withunit"><input type="number" inputmode="decimal" step="any" id="'+id+'">'
+      + '<span class="u">'+unitTxt+'</span></div>';
+  }
+
+  var plantMode={before:"manual", after:"manual"};
+
+  // segmented control
+  document.querySelectorAll('.seg[data-seg]').forEach(function(seg){
+    var ph=seg.getAttribute('data-seg');
+    seg.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click',function(){
+        plantMode[ph]=b.getAttribute('data-mode');
+        seg.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
+        applyPlantMode(ph); render();
+      });
+    });
+  });
+  function applyPlantMode(ph){
+    var lInput=document.getElementById(ph+"_plant_L");
+    var cmInput=document.getElementById(ph+"_plant_cm");
+    if(plantMode[ph]==="auto"){
+      lInput.readOnly=true; lInput.style.opacity=.6; cmInput.placeholder="";
+    }else{
+      lInput.readOnly=false; lInput.style.opacity=1;
+    }
+  }
+  applyPlantMode("before"); applyPlantMode("after");
+
+  function plantL(ph){
+    if(plantMode[ph]==="auto"){
+      var cm=num(document.getElementById(ph+"_plant_cm").value);
+      if(cm==null) return null;
+      return cm*PLANT_M+PLANT_B;
+    }
+    return num(document.getElementById(ph+"_plant_L").value);
+  }
+
+  function phaseData(ph){
+    var dcm=num(document.getElementById(ph+"_dewar_cm").value);
+    var dL=dewarCmToL(dcm);
+    var pcm=num(document.getElementById(ph+"_plant_cm").value);
+    var pL=plantL(ph);
+    if(plantMode[ph]==="auto" && pL!=null){
+      document.getElementById(ph+"_plant_L").value = (Math.round(pL*10)/10);
+    }
+    var psi=num(document.getElementById(ph+"_gas_psi").value);
+    var gL=psi==null?null:psi/GAS_PSI_PER_L;
+    var comps=[dL,pL,gL].filter(function(x){return x!=null;});
+    var total=comps.length?comps.reduce(function(a,b){return a+b;},0):null;
+    return {dcm:dcm,dL:dL,pcm:pcm,pL:pL,psi:psi,gL:gL,total:total,
+            allTotal:(dL!=null&&pL!=null&&gL!=null)};
+  }
+
+  function render(){
+    var b=phaseData("before"), a=phaseData("after");
+    document.getElementById("before_dewarL").textContent=fmt(b.dL)+" L";
+    document.getElementById("after_dewarL").textContent=fmt(a.dL)+" L";
+    document.getElementById("before_gasL").textContent=fmt(b.gL)+" L";
+    document.getElementById("after_gasL").textContent=fmt(a.gL)+" L";
+    document.getElementById("before_total").textContent=fmt(b.total)+" L";
+    document.getElementById("after_total").textContent=fmt(a.total)+" L";
+
+    var dinc=(a.dL!=null&&b.dL!=null)?a.dL-b.dL:null;
+    var pdec=(b.pL!=null&&a.pL!=null)?b.pL-a.pL:null;
+    document.getElementById("r_dinc").textContent=fmt(dinc)+(dinc!=null?" L":"");
+    document.getElementById("r_pdec").textContent=fmt(pdec)+(pdec!=null?" L":"");
+    document.getElementById("r_tb").textContent=fmt(b.total)+(b.total!=null?" L":"");
+    document.getElementById("r_ta").textContent=fmt(a.total)+(a.total!=null?" L":"");
+
+    var effEl=document.getElementById("r_eff"), noteEl=document.getElementById("r_eff_note");
+    if(dinc!=null&&pdec!=null&&pdec!==0){
+      var eff=dinc/pdec*100;
+      effEl.innerHTML=(Math.round(eff*10)/10).toFixed(1)+'<small> %</small>';
+      var col=eff>=68?"var(--good)":eff>=55?"var(--warn)":"var(--bad)";
+      effEl.style.color=col; noteEl.textContent="Dewar 増分 ÷ Plant 減分（普通は 68% 以上）";
+    }else{
+      effEl.textContent="—"; effEl.style.color="var(--text)";
+      noteEl.textContent="Dewar と Plant の before/after を入れてね";
+    }
+    return {b:b,a:a,dinc:dinc,pdec:pdec};
+  }
+
+  // wire inputs
+  document.querySelectorAll('input[type=number]').forEach(function(i){ i.addEventListener('input',render); });
+
+  // NOW buttons
+  document.querySelectorAll('.nowbtn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var d=new Date();
+      document.getElementById(btn.getAttribute('data-now')).value=pad(d.getHours())+":"+pad(d.getMinutes());
+    });
+  });
+  // prefill start time
+  (function(){ var d=new Date(); document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes()); })();
+
+  // theme toggle
+  var themeBtn=document.getElementById("themeBtn");
+  themeBtn.addEventListener('click',function(){
+    var cur=document.documentElement.getAttribute('data-theme');
+    var next = cur==='dark' ? 'light' : cur==='light' ? 'dark'
+      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light':'dark');
+    document.documentElement.setAttribute('data-theme',next);
+  });
+
+  // records
+  var KEY="lhe_records_v1";
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||"[]"); }catch(e){ return []; } }
+  function save(list){ try{ localStorage.setItem(KEY,JSON.stringify(list)); }catch(e){} }
+
+  function effColor(eff){ return eff==null?"var(--text-dim)":eff>=68?"var(--good)":eff>=55?"var(--warn)":"var(--bad)"; }
+  function fmtcm(v){ if(v==null||isNaN(v)) return "—"; return Number.isInteger(v)?(""+v):v.toFixed(1); }
+  function cmL(cm,L){ return fmtcm(cm)+" cm / "+(L==null?"—":fmt(L))+" L"; }
+
+  function renderRecords(){
+    var list=load(), host=document.getElementById("recList");
+    document.getElementById("recCount").textContent=list.length?("("+list.length+")"):"";
+    document.getElementById("recEmpty").style.display=list.length?"none":"block";
+    host.innerHTML="";
+    list.forEach(function(r,idx){
+      var eff=r.eff;
+      var card=document.createElement("div"); card.className="rec";
+      card.innerHTML=
+        '<button class="rec-head" type="button">'
+        +  '<span class="chev">▸</span>'
+        +  '<span class="rec-time">'+(r.start||"—")+(r.end?" → "+r.end:"")+'</span>'
+        +  '<span class="rec-eff" style="background:'+effColor(eff)+'">'+(eff==null?"—":eff.toFixed(1)+"%")+'</span>'
+        +'</button>'
+        +'<div class="rec-body" hidden>'
+        +  '<div class="nb">'
+        +    '<div class="nbc head"><span class="lbl">Start</span><b>'+(r.start||"—")+'</b></div>'
+        +    '<div class="nbc head"><span class="lbl">End</span><b>'+(r.end||"—")+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">Dewar</span><b>'+cmL(r.b_dcm,r.b_dL)+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">Dewar</span><b>'+cmL(r.a_dcm,r.a_dL)+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">Plant</span><b>'+cmL(r.b_pcm,r.b_pL)+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">Plant</span><b>'+cmL(r.a_pcm,r.a_pL)+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">psi</span><b>'+fmt(r.b_psi,0)+' psi</b></div>'
+        +    '<div class="nbc"><span class="lbl">psi</span><b>'+fmt(r.a_psi,0)+' psi</b></div>'
+        +  '</div>'
+        +  '<div class="nb-delta">'
+        +    '<div>ΔDewar<b>'+fmt(r.dinc)+' L</b></div>'
+        +    '<div>ΔPlant<b>'+fmt(r.pdec)+' L</b></div>'
+        +    '<div class="eff">Efficiency<b style="color:'+effColor(eff)+'">'+(eff==null?"—":eff.toFixed(1)+" %")+'</b></div>'
+        +  '</div>'
+        +  '<div class="nbc" style="margin-top:10px;color:var(--text-dim);font-size:.82rem">合計 He: '+fmt(r.b_total)+' → '+fmt(r.a_total)+' L</div>'
+        +  '<button class="del" type="button">この記録を削除</button>'
+        +'</div>';
+      var head=card.querySelector('.rec-head'), bodyEl=card.querySelector('.rec-body');
+      head.addEventListener('click',function(){
+        var open=card.classList.toggle('open');
+        bodyEl.hidden=!open;
+      });
+      card.querySelector('.del').addEventListener('click',function(){
+        var l=load(); l.splice(idx,1); save(l); renderRecords();
+      });
+      host.appendChild(card);
+    });
+  }
+
+  document.getElementById("saveBtn").addEventListener('click',function(){
+    var r=render();
+    var rec={
+      ts:Date.now(),
+      start:document.getElementById("startTime").value||"",
+      end:document.getElementById("endTime").value||"",
+      b_dcm:r.b.dcm, b_dL:r.b.dL, b_pmode:plantMode.before, b_pcm:r.b.pcm, b_pL:r.b.pL, b_psi:r.b.psi, b_gL:r.b.gL, b_total:r.b.total,
+      a_dcm:r.a.dcm, a_dL:r.a.dL, a_pmode:plantMode.after, a_pcm:r.a.pcm, a_pL:r.a.pL, a_psi:r.a.psi, a_gL:r.a.gL, a_total:r.a.total,
+      dinc:r.dinc, pdec:r.pdec,
+      eff:(r.dinc!=null&&r.pdec!=null&&r.pdec!==0)?(r.dinc/r.pdec*100):null
+    };
+    var l=load(); l.unshift(rec); save(l); renderRecords();
+    saveBtn.textContent="保存したよ ✓"; setTimeout(function(){ saveBtn.textContent="この記録を保存"; },1200);
+  });
+  var saveBtn=document.getElementById("saveBtn");
+
+  document.getElementById("clearBtn").addEventListener('click',function(){
+    document.querySelectorAll('input[type=number]').forEach(function(i){ i.value=""; i.readOnly=false; i.style.opacity=1; });
+    plantMode.before="manual"; plantMode.after="manual";
+    document.querySelectorAll('.seg[data-seg]').forEach(function(seg){
+      seg.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x.getAttribute('data-mode')==='manual'?'true':'false'); });
+    });
+    applyPlantMode("before"); applyPlantMode("after");
+    var d=new Date(); document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes());
+    document.getElementById("endTime").value="";
+    render();
+  });
+
+  document.getElementById("csvBtn").addEventListener('click',function(){
+    var list=load();
+    if(!list.length){ alert("書き出す記録がないよ。"); return; }
+    var cols=["start","end",
+      "b_dcm","b_dL","b_pmode","b_pcm","b_pL","b_psi","b_gL","b_total",
+      "a_dcm","a_dL","a_pmode","a_pcm","a_pL","a_psi","a_gL","a_total",
+      "dinc","pdec","eff"];
+    var head=["Start","End",
+      "Dewar_before_cm","Dewar_before_L","Plant_before_mode","Plant_before_cm","Plant_before_L","Gas_before_psi","Gas_before_L","Total_before_L",
+      "Dewar_after_cm","Dewar_after_L","Plant_after_mode","Plant_after_cm","Plant_after_L","Gas_after_psi","Gas_after_L","Total_after_L",
+      "Dewar_increase_L","Plant_decrease_L","Efficiency_pct"];
+    function cell(v){ if(v==null) return ""; if(typeof v==="number") return (Math.round(v*100)/100); return '"'+(""+v).replace(/"/g,'""')+'"'; }
+    var lines=[head.join(",")];
+    // export oldest first
+    list.slice().reverse().forEach(function(r){ lines.push(cols.map(function(c){ return cell(r[c]); }).join(",")); });
+    var blob=new Blob([lines.join("\r\n")],{type:"text/csv"});
+    var url=URL.createObjectURL(blob), a=document.createElement("a");
+    var d=new Date();
+    a.href=url; a.download="LHe_transfers_"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); },1500);
+  });
+
+  render(); renderRecords();
+})();
+</script>
+</body>
+</html>
