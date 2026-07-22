@@ -38,6 +38,7 @@
     --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
   }
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   .wrap{
     font-family:var(--font-sans); color:var(--text); background:var(--bg);
     max-width:760px; margin:0 auto; padding:18px 16px 60px; line-height:1.45;
@@ -64,7 +65,7 @@
   .field{margin-bottom:12px}
   .field:last-child{margin-bottom:0}
   label.lab{display:block; font-size:.82rem; color:var(--text-dim); margin-bottom:5px; font-weight:600}
-  input[type=number], input[type=time]{
+  input[type=number], input[type=time], input[type=date]{
     width:100%; font-family:var(--font-sans); font-size:1.2rem; font-weight:600;
     color:var(--text); background:var(--surface); border:1.5px solid var(--border);
     border-radius:10px; padding:13px 14px; min-height:52px;
@@ -124,7 +125,9 @@
   .rec-head{width:100%; display:flex; align-items:center; gap:10px; padding:13px 14px; background:none; border:none; cursor:pointer; font-family:var(--font-sans); color:var(--text); text-align:left}
   .rec-head .chev{color:var(--text-dim); font-size:.8rem; transition:transform .18s; display:inline-block}
   .rec.open .rec-head .chev{transform:rotate(90deg)}
-  .rec-time{font-weight:700; font-size:1rem; font-variant-numeric:tabular-nums}
+  .rec-when{display:flex; flex-direction:column; gap:1px}
+  .rec-date{font-weight:700; font-size:.98rem; font-variant-numeric:tabular-nums}
+  .rec-time{font-weight:600; font-size:.86rem; color:var(--text-dim); font-variant-numeric:tabular-nums}
   .rec-eff{margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; padding:3px 11px; border-radius:999px; font-size:.9rem; color:#fff}
   .rec-body{padding:2px 14px 14px}
   .nb{display:grid; grid-template-columns:1fr 1fr; gap:8px 14px;
@@ -139,7 +142,16 @@
     font-variant-numeric:tabular-nums; text-align:center}
   .nb-delta div b{display:block; font-size:1.15rem; color:var(--accent-strong); margin-top:2px}
   .nb-delta div.eff{background:var(--accent-weak)}
-  .del{color:var(--bad); cursor:pointer; font-weight:700; background:none; border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:.85rem; font-family:var(--font-sans); margin-top:6px}
+  .rec-actions{display:flex; gap:8px; margin-top:10px}
+  .rec-actions button{flex:1; cursor:pointer; font-weight:700; font-size:.85rem; font-family:var(--font-sans);
+    border:1px solid var(--border); border-radius:8px; padding:9px 14px; background:none}
+  .edit{color:var(--accent-strong); background:var(--accent-weak)!important}
+  .del{color:var(--bad); cursor:pointer; font-weight:700; background:none; border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:.85rem; font-family:var(--font-sans)}
+  .edit-banner{display:flex; align-items:center; gap:10px; justify-content:space-between;
+    background:var(--accent-weak); border:1px solid var(--border); border-radius:11px;
+    padding:11px 14px; margin-bottom:10px; font-size:.85rem; font-weight:600; color:var(--accent-strong)}
+  .edit-banner button{flex:0 0 auto; cursor:pointer; font-family:var(--font-sans); font-weight:700; font-size:.82rem;
+    color:var(--text-dim); background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:7px 14px}
   .empty{color:var(--text-dim); font-size:.9rem; text-align:center; padding:14px 0}
   .theme{background:none; border:1px solid var(--border); color:var(--text-dim); border-radius:8px; padding:5px 10px; font-size:.8rem; cursor:pointer; font-family:var(--font-sans)}
   .note{font-size:.78rem; color:var(--text-dim); margin-top:10px}
@@ -154,6 +166,10 @@
 
   <div class="card">
     <p class="ct">Time</p>
+    <div class="field" style="margin-bottom:12px">
+      <label class="lab" for="recDate">Date</label>
+      <input type="date" id="recDate">
+    </div>
     <div class="two">
       <div class="rowbtn">
         <div class="field"><label class="lab" for="startTime">Start</label>
@@ -185,6 +201,11 @@
       <div class="stat"><div class="k">合計 He (before)</div><div class="v" id="r_tb">—</div></div>
       <div class="stat"><div class="k">合計 He (after)</div><div class="v" id="r_ta">—</div></div>
     </div>
+  </div>
+
+  <div class="edit-banner" id="editBanner" hidden>
+    <span>この記録を編集中 — 直したら「編集を保存」を押してね</span>
+    <button type="button" id="editCancel">やめる</button>
   </div>
 
   <div class="actions">
@@ -223,6 +244,12 @@
   function num(v){ if(v==null) return null; v=(""+v).trim(); if(v==="") return null; var n=parseFloat(v); return isNaN(n)?null:n; }
   function fmt(v,d){ if(v==null||isNaN(v)) return "—"; return v.toFixed(d==null?1:d); }
   function pad(n){ return (n<10?"0":"")+n; }
+  function isoDate(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function fmtDate(iso){ // "YYYY-MM-DD" -> "MM/DD/YYYY"
+    if(!iso) return "";
+    var p=(""+iso).split("-");
+    return p.length===3 ? p[1]+"/"+p[2]+"/"+p[0] : iso;
+  }
 
   var state={}; // holds live values keyed by input id
 
@@ -344,15 +371,19 @@
   // wire inputs
   document.querySelectorAll('input[type=number]').forEach(function(i){ i.addEventListener('input',render); });
 
-  // NOW buttons
+  // NOW buttons: fill the time AND auto-fill today's date
   document.querySelectorAll('.nowbtn').forEach(function(btn){
     btn.addEventListener('click',function(){
       var d=new Date();
       document.getElementById(btn.getAttribute('data-now')).value=pad(d.getHours())+":"+pad(d.getMinutes());
+      document.getElementById("recDate").value=isoDate(d);
     });
   });
-  // prefill start time
-  (function(){ var d=new Date(); document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes()); })();
+  // prefill date + start time
+  (function(){ var d=new Date();
+    document.getElementById("recDate").value=isoDate(d);
+    document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes());
+  })();
 
   // theme toggle
   var themeBtn=document.getElementById("themeBtn");
@@ -367,6 +398,39 @@
   var KEY="lhe_records_v1";
   function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||"[]"); }catch(e){ return []; } }
   function save(list){ try{ localStorage.setItem(KEY,JSON.stringify(list)); }catch(e){} }
+
+  var editingTs=null; // ts of the record currently being edited, or null for a new record
+  function setVal(id,v){ document.getElementById(id).value=(v==null?"":v); }
+
+  function loadIntoForm(r){
+    setVal("recDate", r.date);
+    setVal("startTime", r.start);
+    setVal("endTime", r.end);
+    setVal("before_dewar_cm", r.b_dcm); setVal("after_dewar_cm", r.a_dcm);
+    setVal("before_plant_cm", r.b_pcm); setVal("after_plant_cm", r.a_pcm);
+    setVal("before_plant_L", r.b_pL);   setVal("after_plant_L", r.a_pL);
+    setVal("before_gas_psi", r.b_psi);  setVal("after_gas_psi", r.a_psi);
+    plantMode.before = r.b_pmode || "manual";
+    plantMode.after  = r.a_pmode || "manual";
+    document.querySelectorAll('.seg[data-seg]').forEach(function(seg){
+      var ph=seg.getAttribute('data-seg');
+      seg.querySelectorAll('button').forEach(function(x){
+        x.setAttribute('aria-pressed', x.getAttribute('data-mode')===plantMode[ph]?'true':'false');
+      });
+    });
+    applyPlantMode("before"); applyPlantMode("after");
+    editingTs=r.ts;
+    saveBtn.textContent="編集を保存";
+    document.getElementById("editBanner").hidden=false;
+    render();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  function exitEditMode(){
+    editingTs=null;
+    saveBtn.textContent="この記録を保存";
+    document.getElementById("editBanner").hidden=true;
+  }
 
   function effColor(eff){ return eff==null?"var(--text-dim)":eff>=68?"var(--good)":eff>=55?"var(--warn)":"var(--bad)"; }
   function fmtcm(v){ if(v==null||isNaN(v)) return "—"; return Number.isInteger(v)?(""+v):v.toFixed(1); }
@@ -383,7 +447,10 @@
       card.innerHTML=
         '<button class="rec-head" type="button">'
         +  '<span class="chev">▸</span>'
-        +  '<span class="rec-time">'+(r.start||"—")+(r.end?" → "+r.end:"")+'</span>'
+        +  '<span class="rec-when">'
+        +    (r.date?'<span class="rec-date">'+fmtDate(r.date)+'</span>':'')
+        +    '<span class="rec-time">'+(r.start||"—")+(r.end?" → "+r.end:"")+'</span>'
+        +  '</span>'
         +  '<span class="rec-eff" style="background:'+effColor(eff)+'">'+(eff==null?"—":eff.toFixed(1)+"%")+'</span>'
         +'</button>'
         +'<div class="rec-body" hidden>'
@@ -403,14 +470,19 @@
         +    '<div class="eff">Efficiency<b style="color:'+effColor(eff)+'">'+(eff==null?"—":eff.toFixed(1)+" %")+'</b></div>'
         +  '</div>'
         +  '<div class="nbc" style="margin-top:10px;color:var(--text-dim);font-size:.82rem">合計 He: '+fmt(r.b_total)+' → '+fmt(r.a_total)+' L</div>'
-        +  '<button class="del" type="button">この記録を削除</button>'
+        +  '<div class="rec-actions">'
+        +    '<button class="edit" type="button">編集</button>'
+        +    '<button class="del" type="button">削除</button>'
+        +  '</div>'
         +'</div>';
       var head=card.querySelector('.rec-head'), bodyEl=card.querySelector('.rec-body');
       head.addEventListener('click',function(){
         var open=card.classList.toggle('open');
         bodyEl.hidden=!open;
       });
+      card.querySelector('.edit').addEventListener('click',function(){ loadIntoForm(r); });
       card.querySelector('.del').addEventListener('click',function(){
+        if(editingTs===r.ts) exitEditMode();
         var l=load(); l.splice(idx,1); save(l); renderRecords();
       });
       host.appendChild(card);
@@ -421,6 +493,7 @@
     var r=render();
     var rec={
       ts:Date.now(),
+      date:document.getElementById("recDate").value||"",
       start:document.getElementById("startTime").value||"",
       end:document.getElementById("endTime").value||"",
       b_dcm:r.b.dcm, b_dL:r.b.dL, b_pmode:plantMode.before, b_pcm:r.b.pcm, b_pL:r.b.pL, b_psi:r.b.psi, b_gL:r.b.gL, b_total:r.b.total,
@@ -428,38 +501,54 @@
       dinc:r.dinc, pdec:r.pdec,
       eff:(r.dinc!=null&&r.pdec!=null&&r.pdec!==0)?(r.dinc/r.pdec*100):null
     };
-    var l=load(); l.unshift(rec); save(l); renderRecords();
-    saveBtn.textContent="保存したよ ✓"; setTimeout(function(){ saveBtn.textContent="この記録を保存"; },1200);
+    var l=load();
+    if(editingTs!=null){
+      rec.ts=editingTs; // keep identity + list position
+      var i=-1; for(var k=0;k<l.length;k++){ if(l[k].ts===editingTs){ i=k; break; } }
+      if(i>=0){ l[i]=rec; } else { l.unshift(rec); }
+      editingTs=null; document.getElementById("editBanner").hidden=true;
+      save(l); renderRecords();
+      saveBtn.textContent="更新したよ ✓";
+    }else{
+      l.unshift(rec); save(l); renderRecords();
+      saveBtn.textContent="保存したよ ✓";
+    }
+    setTimeout(function(){ saveBtn.textContent="この記録を保存"; },1200);
   });
   var saveBtn=document.getElementById("saveBtn");
+  document.getElementById("editCancel").addEventListener('click',function(){ resetForm(); });
 
-  document.getElementById("clearBtn").addEventListener('click',function(){
+  function resetForm(){
     document.querySelectorAll('input[type=number]').forEach(function(i){ i.value=""; i.readOnly=false; i.style.opacity=1; });
     plantMode.before="manual"; plantMode.after="manual";
     document.querySelectorAll('.seg[data-seg]').forEach(function(seg){
       seg.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x.getAttribute('data-mode')==='manual'?'true':'false'); });
     });
     applyPlantMode("before"); applyPlantMode("after");
-    var d=new Date(); document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes());
+    var d=new Date();
+    document.getElementById("recDate").value=isoDate(d);
+    document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes());
     document.getElementById("endTime").value="";
+    exitEditMode();
     render();
-  });
+  }
+  document.getElementById("clearBtn").addEventListener('click',resetForm);
 
   document.getElementById("csvBtn").addEventListener('click',function(){
     var list=load();
     if(!list.length){ alert("書き出す記録がないよ。"); return; }
-    var cols=["start","end",
+    var cols=["date","start","end",
       "b_dcm","b_dL","b_pmode","b_pcm","b_pL","b_psi","b_gL","b_total",
       "a_dcm","a_dL","a_pmode","a_pcm","a_pL","a_psi","a_gL","a_total",
       "dinc","pdec","eff"];
-    var head=["Start","End",
+    var head=["Date","Start","End",
       "Dewar_before_cm","Dewar_before_L","Plant_before_mode","Plant_before_cm","Plant_before_L","Gas_before_psi","Gas_before_L","Total_before_L",
       "Dewar_after_cm","Dewar_after_L","Plant_after_mode","Plant_after_cm","Plant_after_L","Gas_after_psi","Gas_after_L","Total_after_L",
       "Dewar_increase_L","Plant_decrease_L","Efficiency_pct"];
-    function cell(v){ if(v==null) return ""; if(typeof v==="number") return (Math.round(v*100)/100); return '"'+(""+v).replace(/"/g,'""')+'"'; }
+    function cell(c,v){ if(v==null||v==="") return ""; if(c==="date") return '"'+fmtDate(v)+'"'; if(typeof v==="number") return (Math.round(v*100)/100); return '"'+(""+v).replace(/"/g,'""')+'"'; }
     var lines=[head.join(",")];
     // export oldest first
-    list.slice().reverse().forEach(function(r){ lines.push(cols.map(function(c){ return cell(r[c]); }).join(",")); });
+    list.slice().reverse().forEach(function(r){ lines.push(cols.map(function(c){ return cell(c,r[c]); }).join(",")); });
     var blob=new Blob([lines.join("\r\n")],{type:"text/csv"});
     var url=URL.createObjectURL(blob), a=document.createElement("a");
     var d=new Date();
