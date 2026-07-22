@@ -72,6 +72,10 @@
     font-variant-numeric:tabular-nums; -moz-appearance:textfield;
   }
   input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  /* iOS: date/time inputs ignore width:100% and overflow via their intrinsic min-width */
+  input[type=date], input[type=time]{-webkit-appearance:none; appearance:none; min-width:0}
+  input[type=date]::-webkit-date-and-time-value,
+  input[type=time]::-webkit-date-and-time-value{text-align:left; margin:0}
   input:focus-visible{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-weak)}
   .withunit{position:relative}
   .withunit .u{position:absolute; right:14px; top:50%; transform:translateY(-50%); color:var(--text-dim); font-size:.9rem; font-weight:600; pointer-events:none}
