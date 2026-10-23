@@ -85,13 +85,6 @@
     margin-top:6px; padding:4px 2px 0; font-size:.86rem; color:var(--text-dim);
   }
   .derived b{font-size:1.05rem; color:var(--accent-strong); font-variant-numeric:tabular-nums; font-weight:700}
-  .seg{display:flex; gap:0; border:1.5px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:8px}
-  .seg button{
-    flex:1; font-family:var(--font-sans); font-size:.82rem; font-weight:600; line-height:1.2;
-    padding:9px 6px; background:var(--surface); color:var(--text-dim); border:none; cursor:pointer;
-  }
-  .seg button + button{border-left:1.5px solid var(--border)}
-  .seg button[aria-pressed=true]{background:var(--accent-weak); color:var(--accent-strong)}
   .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
   .rowbtn{display:flex; gap:8px; align-items:flex-end}
   .rowbtn .field{flex:1; margin:0}
@@ -166,7 +159,7 @@
     <h1>LHe Transfer Helper</h1>
     <button class="theme" id="themeBtn" type="button">◐ theme</button>
   </div>
-  <p class="sub">Dewar は cm を入れると表から L を自動換算・Plant は L/cm 切替・気体は psi→L。効率と合計 He を自動計算。</p>
+  <p class="sub">Dewar は cm を入れると表から L を自動換算・Plant も cm を入れると L を自動計算・気体は psi→L。効率と合計 He を自動計算。</p>
 
   <div class="card">
     <p class="ct">Time</p>
@@ -236,7 +229,19 @@
     83.5,85.5,87.4,89.4,91.4,93.4,95.4,97.4,99.3,101.1,102.9,104.5,105.9,107.2,
     108.2,109.1,109.7,110.0];
   var GAS_PSI_PER_L=6.75;         // 1 L = 6.75 psi
-  var PLANT_M=2.9, PLANT_B=-11.55; // L = cm*2.9 - 11.55  (valid > 90 L)
+  // Plant cm -> L.
+  //  <= 35.0 cm (<= 90 L): quadratic fit to the cm/L pairs in the LHeP Control logs
+  //    (2020-2026, 3.3-35.0 cm, 318 points; max error 0.2 L, rms 0.05 L)
+  //  >  35.0 cm: the gauge shows "> 150", so use L = cm*2.9 - 11.55
+  var PLANT_Q=[0.0075, 2.513, -7.13]; // L = a*cm^2 + b*cm + c
+  var PLANT_M=2.9, PLANT_B=-11.55;
+  var PLANT_SPLIT_CM=35.0;
+
+  function plantCmToL(cm){
+    if(cm==null||isNaN(cm)) return null;
+    if(cm>PLANT_SPLIT_CM+0.05) return cm*PLANT_M+PLANT_B;
+    return Math.max(0, (PLANT_Q[0]*cm+PLANT_Q[1])*cm+PLANT_Q[2]);
+  }
 
   function dewarCmToL(cm){
     if(cm==null||isNaN(cm)) return null;
@@ -267,16 +272,8 @@
       '<p class="phase-t"><span class="dot"></span><b>'+(isB?"Before":"After")+'</b></p>'
       + field(ph,"dewar_cm","Dewar","cm")
       + '<div class="derived"><span>Dewar (表→L)</span><b id="'+ph+'_dewarL">—</b></div>'
-      + '<div class="field"><label class="lab">Plant</label>'
-      +   '<div class="seg" data-seg="'+ph+'">'
-      +     '<button type="button" data-mode="manual" aria-pressed="true">≤90L · L手入力</button>'
-      +     '<button type="button" data-mode="auto" aria-pressed="false">&gt;90L · cmで計算</button>'
-      +   '</div>'
-      +   '<div class="two">'
-      +     unit(ph+'_plant_cm','cm')
-      +     unit(ph+'_plant_L','L')
-      +   '</div>'
-      + '</div>'
+      + field(ph,"plant_cm","Plant","cm")
+      + '<div class="derived"><span>Plant (cm→L)</span><b id="'+ph+'_plantL">—</b></div>'
       + field(ph,"gas_psi","気体","psi")
       + '<div class="derived"><span>気体 (psi→L)</span><b id="'+ph+'_gasL">—</b></div>'
       + '<div class="phase-sub"><span>合計 '+(isB?"before":"after")+'</span><b id="'+ph+'_total">—</b></div>';
@@ -289,42 +286,15 @@
       + '<div class="withunit"><input type="number" inputmode="decimal" step="any" id="'+id+'">'
       + '<span class="u">'+unitTxt+'</span></div></div>';
   }
-  function unit(id,unitTxt){
-    return '<div class="withunit"><input type="number" inputmode="decimal" step="any" id="'+id+'">'
-      + '<span class="u">'+unitTxt+'</span></div>';
-  }
 
-  var plantMode={before:"manual", after:"manual"};
-
-  // segmented control
-  document.querySelectorAll('.seg[data-seg]').forEach(function(seg){
-    var ph=seg.getAttribute('data-seg');
-    seg.querySelectorAll('button').forEach(function(b){
-      b.addEventListener('click',function(){
-        plantMode[ph]=b.getAttribute('data-mode');
-        seg.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
-        applyPlantMode(ph); render();
-      });
-    });
-  });
-  function applyPlantMode(ph){
-    var lInput=document.getElementById(ph+"_plant_L");
-    var cmInput=document.getElementById(ph+"_plant_cm");
-    if(plantMode[ph]==="auto"){
-      lInput.readOnly=true; lInput.style.opacity=.6; cmInput.placeholder="";
-    }else{
-      lInput.readOnly=false; lInput.style.opacity=1;
-    }
-  }
-  applyPlantMode("before"); applyPlantMode("after");
+  // Old records saved in "manual" mode may hold a Plant L without a cm.
+  // Keep that L while editing such a record, until a cm is typed.
+  var legacyPlantL={before:null, after:null};
 
   function plantL(ph){
-    if(plantMode[ph]==="auto"){
-      var cm=num(document.getElementById(ph+"_plant_cm").value);
-      if(cm==null) return null;
-      return cm*PLANT_M+PLANT_B;
-    }
-    return num(document.getElementById(ph+"_plant_L").value);
+    var cm=num(document.getElementById(ph+"_plant_cm").value);
+    if(cm==null) return legacyPlantL[ph];
+    return plantCmToL(cm);
   }
 
   function phaseData(ph){
@@ -332,9 +302,6 @@
     var dL=dewarCmToL(dcm);
     var pcm=num(document.getElementById(ph+"_plant_cm").value);
     var pL=plantL(ph);
-    if(plantMode[ph]==="auto" && pL!=null){
-      document.getElementById(ph+"_plant_L").value = (Math.round(pL*10)/10);
-    }
     var psi=num(document.getElementById(ph+"_gas_psi").value);
     var gL=psi==null?null:psi/GAS_PSI_PER_L;
     var comps=[dL,pL,gL].filter(function(x){return x!=null;});
@@ -347,6 +314,8 @@
     var b=phaseData("before"), a=phaseData("after");
     document.getElementById("before_dewarL").textContent=fmt(b.dL)+" L";
     document.getElementById("after_dewarL").textContent=fmt(a.dL)+" L";
+    document.getElementById("before_plantL").textContent=fmt(b.pL)+" L";
+    document.getElementById("after_plantL").textContent=fmt(a.pL)+" L";
     document.getElementById("before_gasL").textContent=fmt(b.gL)+" L";
     document.getElementById("after_gasL").textContent=fmt(a.gL)+" L";
     document.getElementById("before_total").textContent=fmt(b.total)+" L";
@@ -412,17 +381,9 @@
     setVal("endTime", r.end);
     setVal("before_dewar_cm", r.b_dcm); setVal("after_dewar_cm", r.a_dcm);
     setVal("before_plant_cm", r.b_pcm); setVal("after_plant_cm", r.a_pcm);
-    setVal("before_plant_L", r.b_pL);   setVal("after_plant_L", r.a_pL);
     setVal("before_gas_psi", r.b_psi);  setVal("after_gas_psi", r.a_psi);
-    plantMode.before = r.b_pmode || "manual";
-    plantMode.after  = r.a_pmode || "manual";
-    document.querySelectorAll('.seg[data-seg]').forEach(function(seg){
-      var ph=seg.getAttribute('data-seg');
-      seg.querySelectorAll('button').forEach(function(x){
-        x.setAttribute('aria-pressed', x.getAttribute('data-mode')===plantMode[ph]?'true':'false');
-      });
-    });
-    applyPlantMode("before"); applyPlantMode("after");
+    legacyPlantL.before = r.b_pL==null ? null : r.b_pL;
+    legacyPlantL.after  = r.a_pL==null ? null : r.a_pL;
     editingTs=r.ts;
     saveBtn.textContent="編集を保存";
     document.getElementById("editBanner").hidden=false;
@@ -500,8 +461,8 @@
       date:document.getElementById("recDate").value||"",
       start:document.getElementById("startTime").value||"",
       end:document.getElementById("endTime").value||"",
-      b_dcm:r.b.dcm, b_dL:r.b.dL, b_pmode:plantMode.before, b_pcm:r.b.pcm, b_pL:r.b.pL, b_psi:r.b.psi, b_gL:r.b.gL, b_total:r.b.total,
-      a_dcm:r.a.dcm, a_dL:r.a.dL, a_pmode:plantMode.after, a_pcm:r.a.pcm, a_pL:r.a.pL, a_psi:r.a.psi, a_gL:r.a.gL, a_total:r.a.total,
+      b_dcm:r.b.dcm, b_dL:r.b.dL, b_pmode:plantModeOf(r.b), b_pcm:r.b.pcm, b_pL:r.b.pL, b_psi:r.b.psi, b_gL:r.b.gL, b_total:r.b.total,
+      a_dcm:r.a.dcm, a_dL:r.a.dL, a_pmode:plantModeOf(r.a), a_pcm:r.a.pcm, a_pL:r.a.pL, a_psi:r.a.psi, a_gL:r.a.gL, a_total:r.a.total,
       dinc:r.dinc, pdec:r.pdec,
       eff:(r.dinc!=null&&r.pdec!=null&&r.pdec!==0)?(r.dinc/r.pdec*100):null
     };
@@ -520,15 +481,13 @@
     setTimeout(function(){ saveBtn.textContent="この記録を保存"; },1200);
   });
   var saveBtn=document.getElementById("saveBtn");
+  // "auto" = L computed from cm; "manual" = L kept from an old record that has no cm
+  function plantModeOf(p){ return p.pcm==null && p.pL!=null ? "manual" : "auto"; }
   document.getElementById("editCancel").addEventListener('click',function(){ resetForm(); });
 
   function resetForm(){
     document.querySelectorAll('input[type=number]').forEach(function(i){ i.value=""; i.readOnly=false; i.style.opacity=1; });
-    plantMode.before="manual"; plantMode.after="manual";
-    document.querySelectorAll('.seg[data-seg]').forEach(function(seg){
-      seg.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x.getAttribute('data-mode')==='manual'?'true':'false'); });
-    });
-    applyPlantMode("before"); applyPlantMode("after");
+    legacyPlantL.before=null; legacyPlantL.after=null;
     var d=new Date();
     document.getElementById("recDate").value=isoDate(d);
     document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes());
