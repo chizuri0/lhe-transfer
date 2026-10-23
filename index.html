@@ -46,7 +46,15 @@
   }
   .head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:4px}
   h1{font-size:1.5rem; font-weight:700; letter-spacing:-.01em; margin:0}
-  .sub{color:var(--text-dim); font-size:.9rem; margin:2px 0 18px}
+  .sub{color:var(--text-dim); font-size:.9rem; margin:2px 0 14px}
+  /* process tabs */
+  .tabs{display:flex; border:1.5px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:14px; background:var(--surface)}
+  .tabs button{
+    flex:1; font-family:var(--font-sans); font-size:.95rem; font-weight:700; line-height:1.2;
+    padding:13px 8px; min-height:50px; background:none; color:var(--text-dim); border:none; cursor:pointer;
+  }
+  .tabs button + button{border-left:1.5px solid var(--border)}
+  .tabs button[aria-selected=true]{background:var(--accent); color:#04222a}
   .card{
     background:var(--surface); border:1px solid var(--border); border-radius:14px;
     padding:16px; margin-bottom:14px; box-shadow:var(--shadow);
@@ -64,6 +72,7 @@
   .phase.after .dot{background:var(--warn)}
   .field{margin-bottom:12px}
   .field:last-child{margin-bottom:0}
+  .group{margin-bottom:12px}
   label.lab{display:block; font-size:.82rem; color:var(--text-dim); margin-bottom:5px; font-weight:600}
   input[type=number], input[type=time], input[type=date]{
     width:100%; font-family:var(--font-sans); font-size:1.2rem; font-weight:600;
@@ -117,6 +126,11 @@
   .btn.primary:active{transform:translateY(1px)}
   .btn:focus-visible{outline:none; box-shadow:0 0 0 3px var(--accent-weak)}
   .muted{color:var(--text-dim)}
+  /* record list filter */
+  .filters{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px}
+  .filters button{cursor:pointer; font-family:var(--font-sans); font-weight:700; font-size:.82rem;
+    border:1px solid var(--border); border-radius:999px; padding:6px 13px; background:none; color:var(--text-dim)}
+  .filters button[aria-pressed=true]{background:var(--accent-weak); color:var(--accent-strong); border-color:var(--accent)}
   /* record cards */
   .rec{border:1px solid var(--border); border-radius:12px; margin-bottom:10px; background:var(--surface-2); overflow:hidden}
   .rec-head{width:100%; display:flex; align-items:center; gap:10px; padding:13px 14px; background:none; border:none; cursor:pointer; font-family:var(--font-sans); color:var(--text); text-align:left}
@@ -125,6 +139,8 @@
   .rec-when{display:flex; flex-direction:column; gap:1px}
   .rec-date{font-weight:700; font-size:.98rem; font-variant-numeric:tabular-nums}
   .rec-time{font-weight:600; font-size:.86rem; color:var(--text-dim); font-variant-numeric:tabular-nums}
+  .rec-type{font-size:.72rem; font-weight:700; color:var(--accent-strong); border:1px solid var(--border);
+    border-radius:6px; padding:2px 7px; white-space:nowrap}
   .rec-eff{margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; padding:3px 11px; border-radius:999px; font-size:.9rem; color:#fff}
   .rec-body{padding:2px 14px 14px}
   .nb{display:grid; grid-template-columns:1fr 1fr; gap:8px 14px;
@@ -159,7 +175,13 @@
     <h1>LHe Transfer Helper</h1>
     <button class="theme" id="themeBtn" type="button">◐ theme</button>
   </div>
-  <p class="sub">Dewar は cm を入れると表から L を自動換算・Plant も cm を入れると L を自動計算・気体は psi→L。効率と合計 He を自動計算。</p>
+  <p class="sub">Dewar は cm→L（表）・Cryostat は mm→L・Plant も cm→L・気体は psi→L を自動換算。効率と合計 He を自動計算。</p>
+
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" data-mode="fill" aria-selected="true">Plant → Dewar</button>
+    <button type="button" role="tab" data-mode="cryo" aria-selected="false">Dewar → Cryostat</button>
+  </div>
+  <p class="note" id="draftNote" hidden style="margin:-4px 0 12px"></p>
 
   <div class="card">
     <p class="ct">Time</p>
@@ -193,8 +215,8 @@
         <div class="v" id="r_eff">—</div>
         <div class="muted" id="r_eff_note" style="font-size:.8rem;margin-top:2px"></div>
       </div>
-      <div class="stat"><div class="k">Dewar 増分</div><div class="v" id="r_dinc">—</div></div>
-      <div class="stat"><div class="k">Plant 減分</div><div class="v" id="r_pdec">—</div></div>
+      <div class="stat"><div class="k" id="r_s1k">Dewar 増分</div><div class="v" id="r_s1">—</div></div>
+      <div class="stat"><div class="k" id="r_s2k">Plant 減分</div><div class="v" id="r_s2">—</div></div>
       <div class="stat"><div class="k">合計 He (before)</div><div class="v" id="r_tb">—</div></div>
       <div class="stat"><div class="k">合計 He (after)</div><div class="v" id="r_ta">—</div></div>
     </div>
@@ -213,9 +235,14 @@
 
   <div class="card" style="margin-top:16px">
     <p class="ct">保存した記録 <span class="muted" id="recCount"></span></p>
+    <div class="filters" id="recFilter">
+      <button type="button" data-f="all" aria-pressed="true">全部</button>
+      <button type="button" data-f="fill" aria-pressed="false">Plant → Dewar</button>
+      <button type="button" data-f="cryo" aria-pressed="false">Dewar → Cryostat</button>
+    </div>
     <div id="recList"></div>
     <div class="empty" id="recEmpty">まだ記録はないよ。上で入力して「保存」してね。</div>
-    <p class="note">1件をタップすると、ノートと同じ並びで開くよ。記録はこの端末のブラウザ内（localStorage）だけに保存。CSVで書き出せば表計算にも渡せる。</p>
+    <p class="note">1件をタップすると、ノートと同じ並びで開くよ。記録はこの端末のブラウザ内（localStorage）だけに保存。CSVで書き出せば表計算にも渡せる（2種類の作業が1つのファイルに入って、Type 列で見分けられる）。</p>
   </div>
 </div>
 
@@ -236,13 +263,21 @@
   var PLANT_Q=[0.0075, 2.513, -7.13]; // L = a*cm^2 + b*cm + c
   var PLANT_M=2.9, PLANT_B=-11.55;
   var PLANT_SPLIT_CM=35.0;
+  // Cryostat mm -> L: L = (mm - 288)*0.12 + 2.2
+  var CRYO_MM0=288, CRYO_L_PER_MM=0.12, CRYO_L0=2.2;
+
+  var TYPE_LABEL={fill:"Plant → Dewar", cryo:"Dewar → Cryostat"};
+  var TYPE_CSV={fill:"Plant-to-Dewar", cryo:"Dewar-to-Cryostat"};
 
   function plantCmToL(cm){
     if(cm==null||isNaN(cm)) return null;
     if(cm>PLANT_SPLIT_CM+0.05) return cm*PLANT_M+PLANT_B;
     return Math.max(0, (PLANT_Q[0]*cm+PLANT_Q[1])*cm+PLANT_Q[2]);
   }
-
+  function cryoMmToL(mm){
+    if(mm==null||isNaN(mm)) return null;
+    return Math.max(0, (mm-CRYO_MM0)*CRYO_L_PER_MM+CRYO_L0);
+  }
   function dewarCmToL(cm){
     if(cm==null||isNaN(cm)) return null;
     if(cm<=0) return 0;
@@ -259,23 +294,34 @@
     var p=(""+iso).split("-");
     return p.length===3 ? p[1]+"/"+p[2]+"/"+p[0] : iso;
   }
+  function $(id){ return document.getElementById(id); }
 
-  var state={}; // holds live values keyed by input id
+  var mode="fill"; // "fill" = Plant -> Dewar, "cryo" = Dewar -> Cryostat
 
   // Build the two phase panels
-  var phasesEl=document.getElementById("phases");
+  var phasesEl=$("phases");
   ["before","after"].forEach(function(ph){
     var isB=ph==="before";
     var wrap=document.createElement("div");
     wrap.className="phase "+(isB?"before":"after");
     wrap.innerHTML=
       '<p class="phase-t"><span class="dot"></span><b>'+(isB?"Before":"After")+'</b></p>'
-      + field(ph,"dewar_cm","Dewar","cm")
-      + '<div class="derived"><span>Dewar (表→L)</span><b id="'+ph+'_dewarL">—</b></div>'
-      + field(ph,"plant_cm","Plant","cm")
-      + '<div class="derived"><span>Plant (cm→L)</span><b id="'+ph+'_plantL">—</b></div>'
-      + field(ph,"gas_psi","気体","psi")
-      + '<div class="derived"><span>気体 (psi→L)</span><b id="'+ph+'_gasL">—</b></div>'
+      + '<div class="group">'
+      +   field(ph,"dewar_cm","Dewar","cm")
+      +   '<div class="derived"><span>Dewar (表→L)</span><b id="'+ph+'_dewarL">—</b></div>'
+      + '</div>'
+      + '<div class="group">'
+      +   field(ph,"cryo_mm",'Cryostat<span id="'+ph+'_cryoHint"></span>',"mm")
+      +   '<div class="derived"><span>Cryostat (mm→L)</span><b id="'+ph+'_cryoL">—</b></div>'
+      + '</div>'
+      + '<div class="group">'
+      +   field(ph,"plant_cm",'Plant<span id="'+ph+'_plantHint"></span>',"cm")
+      +   '<div class="derived"><span>Plant (cm→L)</span><b id="'+ph+'_plantL">—</b></div>'
+      + '</div>'
+      + '<div class="group">'
+      +   field(ph,"gas_psi","気体","psi")
+      +   '<div class="derived"><span>気体 (psi→L)</span><b id="'+ph+'_gasL">—</b></div>'
+      + '</div>'
       + '<div class="phase-sub"><span>合計 '+(isB?"before":"after")+'</span><b id="'+ph+'_total">—</b></div>';
     phasesEl.appendChild(wrap);
   });
@@ -292,74 +338,106 @@
   var legacyPlantL={before:null, after:null};
 
   function plantL(ph){
-    var cm=num(document.getElementById(ph+"_plant_cm").value);
+    var cm=num($(ph+"_plant_cm").value);
     if(cm==null) return legacyPlantL[ph];
     return plantCmToL(cm);
   }
 
   function phaseData(ph){
-    var dcm=num(document.getElementById(ph+"_dewar_cm").value);
+    var dcm=num($(ph+"_dewar_cm").value);
     var dL=dewarCmToL(dcm);
-    var pcm=num(document.getElementById(ph+"_plant_cm").value);
+    var cmm=num($(ph+"_cryo_mm").value), cL=cryoMmToL(cmm);
+    var pcm=num($(ph+"_plant_cm").value);
     var pL=plantL(ph);
-    var psi=num(document.getElementById(ph+"_gas_psi").value);
+    var psi=num($(ph+"_gas_psi").value);
     var gL=psi==null?null:psi/GAS_PSI_PER_L;
-    var comps=[dL,pL,gL].filter(function(x){return x!=null;});
+    var comps=[dL,cL,pL,gL].filter(function(x){return x!=null;});
     var total=comps.length?comps.reduce(function(a,b){return a+b;},0):null;
-    return {dcm:dcm,dL:dL,pcm:pcm,pL:pL,psi:psi,gL:gL,total:total,
-            allTotal:(dL!=null&&pL!=null&&gL!=null)};
+    return {dcm:dcm,dL:dL,cmm:cmm,cL:cL,pcm:pcm,pL:pL,psi:psi,gL:gL,total:total};
   }
+
+  function effColor(eff){ // same bands for both transfers
+    if(eff==null) return "var(--text-dim)";
+    return eff>=78?"var(--good)":eff>=65?"var(--warn)":"var(--bad)";
+  }
+  function setStat(id,v){ $(id).textContent=fmt(v)+(v!=null?" L":""); }
 
   function render(){
     var b=phaseData("before"), a=phaseData("after");
-    document.getElementById("before_dewarL").textContent=fmt(b.dL)+" L";
-    document.getElementById("after_dewarL").textContent=fmt(a.dL)+" L";
-    document.getElementById("before_plantL").textContent=fmt(b.pL)+" L";
-    document.getElementById("after_plantL").textContent=fmt(a.pL)+" L";
-    document.getElementById("before_gasL").textContent=fmt(b.gL)+" L";
-    document.getElementById("after_gasL").textContent=fmt(a.gL)+" L";
-    document.getElementById("before_total").textContent=fmt(b.total)+" L";
-    document.getElementById("after_total").textContent=fmt(a.total)+" L";
+    ["before","after"].forEach(function(ph){
+      var p=ph==="before"?b:a;
+      $(ph+"_dewarL").textContent=fmt(p.dL)+" L";
+      $(ph+"_cryoL").textContent=fmt(p.cL)+" L";
+      $(ph+"_plantL").textContent=fmt(p.pL)+" L";
+      $(ph+"_gasL").textContent=fmt(p.gL)+" L";
+      $(ph+"_total").textContent=fmt(p.total)+" L";
+    });
+    setStat("r_tb",b.total); setStat("r_ta",a.total);
 
-    var dinc=(a.dL!=null&&b.dL!=null)?a.dL-b.dL:null;
-    var pdec=(b.pL!=null&&a.pL!=null)?b.pL-a.pL:null;
-    document.getElementById("r_dinc").textContent=fmt(dinc)+(dinc!=null?" L":"");
-    document.getElementById("r_pdec").textContent=fmt(pdec)+(pdec!=null?" L":"");
-    document.getElementById("r_tb").textContent=fmt(b.total)+(b.total!=null?" L":"");
-    document.getElementById("r_ta").textContent=fmt(a.total)+(a.total!=null?" L":"");
-
-    var effEl=document.getElementById("r_eff"), noteEl=document.getElementById("r_eff_note");
-    if(dinc!=null&&pdec!=null&&pdec!==0){
-      var eff=dinc/pdec*100;
-      effEl.innerHTML=(Math.round(eff*10)/10).toFixed(1)+'<small> %</small>';
-      var col=eff>=68?"var(--good)":eff>=55?"var(--warn)":"var(--bad)";
-      effEl.style.color=col; noteEl.textContent="Dewar 増分 ÷ Plant 減分（普通は 68% 以上）";
+    var r={b:b,a:a,type:mode,dinc:null,pdec:null,ddec:null,cinc:null,eff:null};
+    var effEl=$("r_eff"), noteEl=$("r_eff_note");
+    if(mode==="fill"){
+      r.dinc=(a.dL!=null&&b.dL!=null)?a.dL-b.dL:null;
+      r.pdec=(b.pL!=null&&a.pL!=null)?b.pL-a.pL:null;
+      if(r.dinc!=null&&r.pdec!=null&&r.pdec!==0) r.eff=r.dinc/r.pdec*100;
+      $("r_s1k").textContent="Dewar 増分"; setStat("r_s1",r.dinc);
+      $("r_s2k").textContent="Plant 減分"; setStat("r_s2",r.pdec);
+      noteEl.textContent=r.eff!=null?"Dewar 増分 ÷ Plant 減分（78% 以上で緑）":"Dewar と Plant の before/after を入れてね";
+    }else{
+      r.ddec=(b.dL!=null&&a.dL!=null)?b.dL-a.dL:null;
+      r.cinc=(a.cL!=null&&b.cL!=null)?a.cL-b.cL:null;
+      if(r.cinc!=null&&r.ddec!=null&&r.ddec!==0) r.eff=r.cinc/r.ddec*100;
+      $("r_s1k").textContent="Dewar 減分"; setStat("r_s1",r.ddec);
+      $("r_s2k").textContent="Cryostat 増分"; setStat("r_s2",r.cinc);
+      noteEl.textContent=r.eff!=null?"Cryostat 増分 ÷ Dewar 減分（78% 以上で緑）":"Dewar と Cryostat の before/after を入れてね";
+    }
+    if(r.eff!=null){
+      effEl.innerHTML=(Math.round(r.eff*10)/10).toFixed(1)+'<small> %</small>';
+      effEl.style.color=effColor(r.eff);
     }else{
       effEl.textContent="—"; effEl.style.color="var(--text)";
-      noteEl.textContent="Dewar と Plant の before/after を入れてね";
     }
-    return {b:b,a:a,dinc:dinc,pdec:pdec};
+    return r;
   }
 
   // wire inputs
   document.querySelectorAll('input[type=number]').forEach(function(i){ i.addEventListener('input',render); });
 
+  // The level the transfer doesn't touch is the same before and after, so its
+  // after field copies before unless typed over:
+  //   Plant -> Dewar: Cryostat  /  Dewar -> Cryostat: Plant
+  var MIRROR={fill:"cryo_mm", cryo:"plant_cm"};
+  ["cryo_mm","plant_cm"].forEach(function(key){
+    var after=$("after_"+key);
+    $("before_"+key).addEventListener('input',function(){
+      if(MIRROR[mode]!==key) return;
+      if(after.value==="" || after.dataset.auto==="1"){
+        after.value=$("before_"+key).value; after.dataset.auto="1";
+        render();
+      }
+    });
+    after.addEventListener('input',function(){ after.dataset.auto="0"; });
+  });
+  function mirrorAuto(){ return {cryo_mm:$("after_cryo_mm").dataset.auto, plant_cm:$("after_plant_cm").dataset.auto}; }
+  function setMirrorAuto(a){
+    ["cryo_mm","plant_cm"].forEach(function(key){
+      var el=$("after_"+key);
+      el.dataset.auto = a&&a[key]!=null ? a[key] : (el.value===$("before_"+key).value ? "1" : "0");
+    });
+  }
+
   // NOW buttons: fill the time AND auto-fill today's date
   document.querySelectorAll('.nowbtn').forEach(function(btn){
     btn.addEventListener('click',function(){
       var d=new Date();
-      document.getElementById(btn.getAttribute('data-now')).value=pad(d.getHours())+":"+pad(d.getMinutes());
-      document.getElementById("recDate").value=isoDate(d);
+      $(btn.getAttribute('data-now')).value=pad(d.getHours())+":"+pad(d.getMinutes());
+      $("recDate").value=isoDate(d);
+      markDirty();
     });
   });
-  // prefill date + start time
-  (function(){ var d=new Date();
-    document.getElementById("recDate").value=isoDate(d);
-    document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes());
-  })();
 
   // theme toggle
-  var themeBtn=document.getElementById("themeBtn");
+  var themeBtn=$("themeBtn");
   themeBtn.addEventListener('click',function(){
     var cur=document.documentElement.getAttribute('data-theme');
     var next = cur==='dark' ? 'light' : cur==='light' ? 'dark'
@@ -371,43 +449,94 @@
   var KEY="lhe_records_v1";
   function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||"[]"); }catch(e){ return []; } }
   function save(list){ try{ localStorage.setItem(KEY,JSON.stringify(list)); }catch(e){} }
+  function typeOf(r){ return r.type||"fill"; } // records from before the cryostat tab are all fills
 
   var editingTs=null; // ts of the record currently being edited, or null for a new record
-  function setVal(id,v){ document.getElementById(id).value=(v==null?"":v); }
+  var saveBtn=$("saveBtn");
+  function setVal(id,v){ $(id).value=(v==null?"":v); }
+
+  // Empty the form for the current mode (the stored draft is left alone)
+  function blankForm(){
+    document.querySelectorAll('input[type=number]').forEach(function(i){ i.value=""; });
+    setMirrorAuto({cryo_mm:"1", plant_cm:"1"});
+    legacyPlantL.before=null; legacyPlantL.after=null;
+    var d=new Date();
+    $("recDate").value=isoDate(d);
+    $("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes());
+    $("endTime").value="";
+    exitEditMode();
+    $("draftNote").hidden=true;
+    dirty=false;
+  }
+
+  function applyMode(){
+    document.querySelectorAll('.tabs button').forEach(function(t){
+      t.setAttribute('aria-selected', t.getAttribute('data-mode')===mode?'true':'false');
+    });
+    var same="（before と同じ値が入るよ）";
+    $("before_cryoHint").textContent = mode==="fill" ? "（測ったときだけ）" : "";
+    $("after_cryoHint").textContent  = mode==="fill" ? same : "";
+    $("after_plantHint").textContent = mode==="cryo" ? same : "";
+  }
+  function setMode(m){
+    if(m===mode) return;
+    saveDraft();             // keep what was typed in the tab we're leaving
+    mode=m;
+    try{ localStorage.setItem("lhe_mode",mode); }catch(e){}
+    applyMode(); blankForm(); restoreDraft(); render();
+  }
+  document.querySelectorAll('.tabs button').forEach(function(t){
+    t.addEventListener('click',function(){ setMode(t.getAttribute('data-mode')); });
+  });
 
   function loadIntoForm(r){
+    setMode(typeOf(r));
+    blankForm();
     setVal("recDate", r.date);
     setVal("startTime", r.start);
     setVal("endTime", r.end);
     setVal("before_dewar_cm", r.b_dcm); setVal("after_dewar_cm", r.a_dcm);
+    setVal("before_cryo_mm", r.b_cmm);  setVal("after_cryo_mm", r.a_cmm);
     setVal("before_plant_cm", r.b_pcm); setVal("after_plant_cm", r.a_pcm);
     setVal("before_gas_psi", r.b_psi);  setVal("after_gas_psi", r.a_psi);
+    setMirrorAuto(null);
     legacyPlantL.before = r.b_pL==null ? null : r.b_pL;
     legacyPlantL.after  = r.a_pL==null ? null : r.a_pL;
     editingTs=r.ts;
     saveBtn.textContent="編集を保存";
-    document.getElementById("editBanner").hidden=false;
+    $("editBanner").hidden=false;
     render();
+    markDirty();
     window.scrollTo({top:0, behavior:'smooth'});
   }
 
   function exitEditMode(){
     editingTs=null;
     saveBtn.textContent="この記録を保存";
-    document.getElementById("editBanner").hidden=true;
+    $("editBanner").hidden=true;
   }
 
-  function effColor(eff){ return eff==null?"var(--text-dim)":eff>=68?"var(--good)":eff>=55?"var(--warn)":"var(--bad)"; }
   function fmtcm(v){ if(v==null||isNaN(v)) return "—"; return Number.isInteger(v)?(""+v):v.toFixed(1); }
-  function cmL(cm,L){ return fmtcm(cm)+" cm / "+(L==null?"—":fmt(L))+" L"; }
+  function withL(v,u,L){ return fmtcm(v)+" "+u+" / "+(L==null?"—":fmt(L))+" L"; }
+
+  var recFilter="all";
+  document.querySelectorAll('#recFilter button').forEach(function(b){
+    b.addEventListener('click',function(){
+      recFilter=b.getAttribute('data-f');
+      document.querySelectorAll('#recFilter button').forEach(function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
+      renderRecords();
+    });
+  });
 
   function renderRecords(){
-    var list=load(), host=document.getElementById("recList");
-    document.getElementById("recCount").textContent=list.length?("("+list.length+")"):"";
-    document.getElementById("recEmpty").style.display=list.length?"none":"block";
+    var all=load(), host=$("recList");
+    var list=all.filter(function(r){ return recFilter==="all" || typeOf(r)===recFilter; });
+    $("recCount").textContent=all.length?("("+(list.length===all.length?all.length:list.length+" / "+all.length)+")"):"";
+    $("recEmpty").style.display=list.length?"none":"block";
     host.innerHTML="";
-    list.forEach(function(r,idx){
-      var eff=r.eff;
+    list.forEach(function(r){
+      var eff=r.eff, type=typeOf(r), isC=type==="cryo";
+      var hasCryo = isC || r.b_cmm!=null || r.a_cmm!=null;
       var card=document.createElement("div"); card.className="rec";
       card.innerHTML=
         '<button class="rec-head" type="button">'
@@ -416,22 +545,30 @@
         +    (r.date?'<span class="rec-date">'+fmtDate(r.date)+'</span>':'')
         +    '<span class="rec-time">'+(r.start||"—")+(r.end?" → "+r.end:"")+'</span>'
         +  '</span>'
+        +  '<span class="rec-type">'+TYPE_LABEL[type]+'</span>'
         +  '<span class="rec-eff" style="background:'+effColor(eff)+'">'+(eff==null?"—":eff.toFixed(1)+"%")+'</span>'
         +'</button>'
         +'<div class="rec-body" hidden>'
         +  '<div class="nb">'
         +    '<div class="nbc head"><span class="lbl">Start</span><b>'+(r.start||"—")+'</b></div>'
         +    '<div class="nbc head"><span class="lbl">End</span><b>'+(r.end||"—")+'</b></div>'
-        +    '<div class="nbc"><span class="lbl">Dewar</span><b>'+cmL(r.b_dcm,r.b_dL)+'</b></div>'
-        +    '<div class="nbc"><span class="lbl">Dewar</span><b>'+cmL(r.a_dcm,r.a_dL)+'</b></div>'
-        +    '<div class="nbc"><span class="lbl">Plant</span><b>'+cmL(r.b_pcm,r.b_pL)+'</b></div>'
-        +    '<div class="nbc"><span class="lbl">Plant</span><b>'+cmL(r.a_pcm,r.a_pL)+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">Dewar</span><b>'+withL(r.b_dcm,"cm",r.b_dL)+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">Dewar</span><b>'+withL(r.a_dcm,"cm",r.a_dL)+'</b></div>'
+        +    (hasCryo
+        ?    '<div class="nbc"><span class="lbl">Cryostat</span><b>'+withL(r.b_cmm,"mm",r.b_cL)+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">Cryostat</span><b>'+withL(r.a_cmm,"mm",r.a_cL)+'</b></div>'
+        :    '')
+        +    '<div class="nbc"><span class="lbl">Plant</span><b>'+withL(r.b_pcm,"cm",r.b_pL)+'</b></div>'
+        +    '<div class="nbc"><span class="lbl">Plant</span><b>'+withL(r.a_pcm,"cm",r.a_pL)+'</b></div>'
         +    '<div class="nbc"><span class="lbl">psi</span><b>'+fmt(r.b_psi,0)+' psi</b></div>'
         +    '<div class="nbc"><span class="lbl">psi</span><b>'+fmt(r.a_psi,0)+' psi</b></div>'
         +  '</div>'
         +  '<div class="nb-delta">'
-        +    '<div>ΔDewar<b>'+fmt(r.dinc)+' L</b></div>'
-        +    '<div>ΔPlant<b>'+fmt(r.pdec)+' L</b></div>'
+        +    (isC
+        ?    '<div>Dewar 減分<b>'+fmt(r.ddec)+' L</b></div>'
+        +    '<div>Cryostat 増分<b>'+fmt(r.cinc)+' L</b></div>'
+        :    '<div>ΔDewar<b>'+fmt(r.dinc)+' L</b></div>'
+        +    '<div>ΔPlant<b>'+fmt(r.pdec)+' L</b></div>')
         +    '<div class="eff">Efficiency<b style="color:'+effColor(eff)+'">'+(eff==null?"—":eff.toFixed(1)+" %")+'</b></div>'
         +  '</div>'
         +  '<div class="nbc" style="margin-top:10px;color:var(--text-dim);font-size:.82rem">合計 He: '+fmt(r.b_total)+' → '+fmt(r.a_total)+' L</div>'
@@ -448,70 +585,67 @@
       card.querySelector('.edit').addEventListener('click',function(){ loadIntoForm(r); });
       card.querySelector('.del').addEventListener('click',function(){
         if(editingTs===r.ts) exitEditMode();
-        var l=load(); l.splice(idx,1); save(l); renderRecords();
+        save(load().filter(function(x){ return x.ts!==r.ts; })); renderRecords();
       });
       host.appendChild(card);
     });
   }
 
-  document.getElementById("saveBtn").addEventListener('click',function(){
+  // "auto" = L computed from cm; "manual" = L kept from an old record that has no cm
+  function plantModeOf(p){ return p.pcm==null && p.pL!=null ? "manual" : "auto"; }
+
+  saveBtn.addEventListener('click',function(){
     var r=render();
     var rec={
-      ts:Date.now(),
-      date:document.getElementById("recDate").value||"",
-      start:document.getElementById("startTime").value||"",
-      end:document.getElementById("endTime").value||"",
-      b_dcm:r.b.dcm, b_dL:r.b.dL, b_pmode:plantModeOf(r.b), b_pcm:r.b.pcm, b_pL:r.b.pL, b_psi:r.b.psi, b_gL:r.b.gL, b_total:r.b.total,
-      a_dcm:r.a.dcm, a_dL:r.a.dL, a_pmode:plantModeOf(r.a), a_pcm:r.a.pcm, a_pL:r.a.pL, a_psi:r.a.psi, a_gL:r.a.gL, a_total:r.a.total,
-      dinc:r.dinc, pdec:r.pdec,
-      eff:(r.dinc!=null&&r.pdec!=null&&r.pdec!==0)?(r.dinc/r.pdec*100):null
+      ts:Date.now(), type:mode,
+      date:$("recDate").value||"",
+      start:$("startTime").value||"",
+      end:$("endTime").value||"",
+      b_dcm:r.b.dcm, b_dL:r.b.dL, b_cmm:r.b.cmm, b_cL:r.b.cL, b_pmode:plantModeOf(r.b), b_pcm:r.b.pcm, b_pL:r.b.pL, b_psi:r.b.psi, b_gL:r.b.gL, b_total:r.b.total,
+      a_dcm:r.a.dcm, a_dL:r.a.dL, a_cmm:r.a.cmm, a_cL:r.a.cL, a_pmode:plantModeOf(r.a), a_pcm:r.a.pcm, a_pL:r.a.pL, a_psi:r.a.psi, a_gL:r.a.gL, a_total:r.a.total,
+      dinc:r.dinc, pdec:r.pdec, ddec:r.ddec, cinc:r.cinc, eff:r.eff
     };
     var l=load();
     if(editingTs!=null){
       rec.ts=editingTs; // keep identity + list position
       var i=-1; for(var k=0;k<l.length;k++){ if(l[k].ts===editingTs){ i=k; break; } }
       if(i>=0){ l[i]=rec; } else { l.unshift(rec); }
-      editingTs=null; document.getElementById("editBanner").hidden=true;
+      editingTs=null; $("editBanner").hidden=true;
       save(l); renderRecords();
       saveBtn.textContent="更新したよ ✓";
     }else{
       l.unshift(rec); save(l); renderRecords();
       saveBtn.textContent="保存したよ ✓";
     }
+    clearDraft();
     setTimeout(function(){ saveBtn.textContent="この記録を保存"; },1200);
   });
-  var saveBtn=document.getElementById("saveBtn");
-  // "auto" = L computed from cm; "manual" = L kept from an old record that has no cm
-  function plantModeOf(p){ return p.pcm==null && p.pL!=null ? "manual" : "auto"; }
-  document.getElementById("editCancel").addEventListener('click',function(){ resetForm(); });
+  $("editCancel").addEventListener('click',function(){ resetForm(); });
 
   function resetForm(){
-    document.querySelectorAll('input[type=number]').forEach(function(i){ i.value=""; i.readOnly=false; i.style.opacity=1; });
-    legacyPlantL.before=null; legacyPlantL.after=null;
-    var d=new Date();
-    document.getElementById("recDate").value=isoDate(d);
-    document.getElementById("startTime").value=pad(d.getHours())+":"+pad(d.getMinutes());
-    document.getElementById("endTime").value="";
-    exitEditMode();
+    blankForm();
     render();
+    clearDraft();
   }
-  document.getElementById("clearBtn").addEventListener('click',resetForm);
+  $("clearBtn").addEventListener('click',resetForm);
 
-  document.getElementById("csvBtn").addEventListener('click',function(){
+  $("csvBtn").addEventListener('click',function(){
     var list=load();
     if(!list.length){ alert("書き出す記録がないよ。"); return; }
-    var cols=["date","start","end",
-      "b_dcm","b_dL","b_pmode","b_pcm","b_pL","b_psi","b_gL","b_total",
-      "a_dcm","a_dL","a_pmode","a_pcm","a_pL","a_psi","a_gL","a_total",
-      "dinc","pdec","eff"];
-    var head=["Date","Start","End",
-      "Dewar_before_cm","Dewar_before_L","Plant_before_mode","Plant_before_cm","Plant_before_L","Gas_before_psi","Gas_before_L","Total_before_L",
-      "Dewar_after_cm","Dewar_after_L","Plant_after_mode","Plant_after_cm","Plant_after_L","Gas_after_psi","Gas_after_L","Total_after_L",
-      "Dewar_increase_L","Plant_decrease_L","Efficiency_pct"];
+    var cols=["type","date","start","end",
+      "b_dcm","b_dL","b_cmm","b_cL","b_pmode","b_pcm","b_pL","b_psi","b_gL","b_total",
+      "a_dcm","a_dL","a_cmm","a_cL","a_pmode","a_pcm","a_pL","a_psi","a_gL","a_total",
+      "dinc","pdec","ddec","cinc","eff"];
+    var head=["Type","Date","Start","End",
+      "Dewar_before_cm","Dewar_before_L","Cryostat_before_mm","Cryostat_before_L","Plant_before_mode","Plant_before_cm","Plant_before_L","Gas_before_psi","Gas_before_L","Total_before_L",
+      "Dewar_after_cm","Dewar_after_L","Cryostat_after_mm","Cryostat_after_L","Plant_after_mode","Plant_after_cm","Plant_after_L","Gas_after_psi","Gas_after_L","Total_after_L",
+      "Dewar_increase_L","Plant_decrease_L","Dewar_decrease_L","Cryostat_increase_L","Efficiency_pct"];
     function cell(c,v){ if(v==null||v==="") return ""; if(c==="date") return '"'+fmtDate(v)+'"'; if(typeof v==="number") return (Math.round(v*100)/100); return '"'+(""+v).replace(/"/g,'""')+'"'; }
     var lines=[head.join(",")];
     // export oldest first
-    list.slice().reverse().forEach(function(r){ lines.push(cols.map(function(c){ return cell(c,r[c]); }).join(",")); });
+    list.slice().reverse().forEach(function(r){
+      lines.push(cols.map(function(c){ return c==="type" ? cell(c,TYPE_CSV[typeOf(r)]) : cell(c,r[c]); }).join(","));
+    });
     var blob=new Blob([lines.join("\r\n")],{type:"text/csv"});
     var url=URL.createObjectURL(blob), a=document.createElement("a");
     var d=new Date();
@@ -519,6 +653,59 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function(){ URL.revokeObjectURL(url); },1500);
   });
+
+  // Draft: keep the unsaved form in localStorage so it survives the phone
+  // dropping the tab during a long (~1 h) transfer. One draft per tab.
+  // Cleared on save / clear.
+  function draftKey(){ return "lhe_draft_v1_"+mode; }
+  var dirty=false; // typed since the last save / clear (a saved form left on screen is not a draft)
+  var FORM_IDS=["recDate","startTime","endTime",
+    "before_dewar_cm","before_cryo_mm","before_plant_cm","before_gas_psi",
+    "after_dewar_cm","after_cryo_mm","after_plant_cm","after_gas_psi"];
+  function saveDraft(){
+    if(!dirty) return;
+    var v={};
+    FORM_IDS.forEach(function(id){ v[id]=$(id).value; });
+    // date/start are prefilled on load, so they alone don't make a draft
+    var any = editingTs!=null || v.endTime!=="" ||
+      FORM_IDS.slice(3).some(function(id){ return v[id]!==""; });
+    try{
+      if(!any){ localStorage.removeItem(draftKey()); return; }
+      localStorage.setItem(draftKey(), JSON.stringify({v:v, mirrorAuto:mirrorAuto(), editingTs:editingTs, legacy:legacyPlantL, at:Date.now()}));
+    }catch(e){}
+  }
+  function clearDraft(){
+    dirty=false;
+    try{ localStorage.removeItem(draftKey()); }catch(e){}
+    $("draftNote").hidden=true;
+  }
+  function restoreDraft(){
+    var d; try{ d=JSON.parse(localStorage.getItem(draftKey())||"null"); }catch(e){ d=null; }
+    if(!d||!d.v) return;
+    dirty=true;
+    FORM_IDS.forEach(function(id){ if(d.v[id]!=null) $(id).value=d.v[id]; });
+    setMirrorAuto(d.mirrorAuto);
+    if(d.legacy){ legacyPlantL.before=d.legacy.before; legacyPlantL.after=d.legacy.after; }
+    if(d.editingTs!=null && load().some(function(r){ return r.ts===d.editingTs; })){
+      editingTs=d.editingTs;
+      saveBtn.textContent="編集を保存";
+      $("editBanner").hidden=false;
+    }
+    var t=new Date(d.at), note=$("draftNote");
+    note.textContent="途中の入力を戻したよ（最後の入力 "+fmtDate(isoDate(t))+" "+pad(t.getHours())+":"+pad(t.getMinutes())+"）。終わったら「保存」してね。";
+    note.hidden=false;
+  }
+  FORM_IDS.forEach(function(id){
+    var el=$(id);
+    el.addEventListener('input',markDirty); el.addEventListener('change',markDirty);
+  });
+  function markDirty(){ dirty=true; saveDraft(); }
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') saveDraft(); });
+  window.addEventListener('pagehide',saveDraft);
+
+  // start in the tab that was open last time
+  try{ var m=localStorage.getItem("lhe_mode"); if(m==="fill"||m==="cryo") mode=m; }catch(e){}
+  applyMode(); blankForm(); restoreDraft();
 
   render(); renderRecords();
 })();
